@@ -2,19 +2,19 @@
  * @file    main.c
  * @author  Jeremy Urena
  * @board   ESP-S3-DevKitC-1 v1.1
- * This is an RTOS-based firmware for authenticating a pet at a pet door using a PN532 RFID Reader
+ * This is an RTOS-based firmware for authenticating a pet at a door using a PN532 RFID Reader
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <esp_log.h>
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "sdkconfig.h"
-#include "pn532_driver_i2c.h"
-#include "pn532.h"
 #include "iot_servo.h"
+#include "pn532.h"
+#include "pn532_driver_i2c.h"
+#include "sdkconfig.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 /*
  * Main purpose: Get the servo to rotate 90 degrees when card is read. 
@@ -26,7 +26,7 @@
 #define RESET_PIN  (-1) // Could be configured if valid
 #define IRQ_PIN    (4)
 
-#define SERVO_PIN           5
+#define SERVO_PIN           (5)
 #define SERVO_MAX_ANGLE     180
 #define SERVO_MIN_WIDTH     500
 #define SERVO_MAX_WIDTH     2400
@@ -118,9 +118,9 @@ void app_main()
 
             if (uid_value == UID_VAL)
             {
-                iot_servo_write_angle(LEDC_LOW_SPEED_MODE, 0, (servo_calibration_val_180 / 2) + 10); // Slight offset for 90 degrees
+                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 2) + 10); // Slight offset for 90 degrees
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
-                iot_servo_write_angle(LEDC_LOW_SPEED_MODE, 0, servo_calibration_val_0);
+                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
             }
 
         }
