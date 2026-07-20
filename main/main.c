@@ -5,6 +5,7 @@
  * This is an RTOS-based firmware for authenticating a pet at a door using a PN532 RFID Reader
  */
 
+#include "driver/gpio.h"
 #include <esp_log.h>
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -37,15 +38,25 @@
 #define SERVO_SPEED_MODE    LEDC_LOW_SPEED_MODE
 
 
+// For IR Beam
+//  First enable IO MUX for GPIO 6 to be in input mode
+//  Then, read from 6th bit position from GPIO input register
+uint32_t volatile * const IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
+uint32_t volatile * const GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);
+
+
+
 static const uint32_t UID_VAL = 0x97F6B001;
 static const char *TAG_PN532 = "ntag_read";
 static const char *TAG_SERVO = "servo_control";
+static const char *TAG_IR    = "break_beam";
 
 static uint16_t servo_calibration_val_0 = 20;
 static uint16_t servo_calibration_val_180 = 200;
 
 uint32_t find_uid_value(uint8_t arr[], uint8_t length);
-void servo_init(servo_config_t * srv_cfg);    
+void servo_init(servo_config_t * srv_cfg);
+void ir_init();
 
 servo_config_t servo_config = {
     .max_angle      = SERVO_MAX_ANGLE,
@@ -64,8 +75,13 @@ servo_config_t servo_config = {
     .channel_number = SERVO_CHANNEL_NUM
 };
 
+#define GPIO_OUTPUT_IO CONFIG_GPIO
+
 void app_main() 
 {
+    // IR break beam stuff
+    ir_init();
+    
     // Create PN532 object
     pn532_io_t pn532_io;
     esp_err_t err;
@@ -98,6 +114,9 @@ void app_main()
     // Main loop
     for (;;)
     {
+        // Check IR break
+        ESP_LOGI(TAG_IR, "IR GPIO VALUE: %d", ((*GPIO_IN_REG >> 6) & 0x1));
+
         // Reset to 0 to avoid lingering values after next iteration
         memset(uid, 0, sizeof(uid));
         uid_length = 0;
@@ -153,4 +172,10 @@ void servo_init(servo_config_t * srv_cfg)
     {
         ESP_LOGI(TAG_SERVO, "FAILED TO INIT SERVO");
     }
+}
+
+void ir_init()
+{
+    *IO_MUX_GPIO6_REG |= (0x1 << 9);
+    ESP_LOGI(TAG_IR, "IR BREAK BEAM INIT");
 }
