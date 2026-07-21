@@ -17,22 +17,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "inc/door_control.h"
+#include "inc/pn532_rfid.h"
 
 /*
  * Main purpose: Get the servo to rotate 90 degrees when card is read. 
  *               Rotate 90 degrees back after timer runs out.
  */
 
-#define SCL_PIN    (8)
-#define SDA_PIN    (9)
-#define RESET_PIN  (-1) // Could be configured if valid
-#define IRQ_PIN    (4)
-
 // For IR Beam
 //  First enable IO MUX for GPIO 6 to be in input mode
 //  Then, read from 6th bit position from GPIO input register
-uint32_t volatile * const IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
-uint32_t volatile * const GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);
+uint32_t volatile * const IR_IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
+uint32_t volatile * const IR_GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);
 
 static const uint32_t UID_VAL = 0x97F6B001;
 static const char *TAG_PN532 = "ntag_read";
@@ -41,9 +37,6 @@ static const char *TAG_IR    = "break_beam";
 
 static uint16_t servo_calibration_val_0 = 20;
 static uint16_t servo_calibration_val_180 = 200;
-
-uint32_t find_uid_value(uint8_t arr[], uint8_t length);
-
 
 servo_config_t servo_config = {
     .max_angle      = SERVO_MAX_ANGLE,
@@ -67,7 +60,7 @@ servo_config_t servo_config = {
 void app_main() 
 {
     // IR break beam stuff
-    ir_init(TAG_IR, IO_MUX_GPIO6_REG);
+    ir_init(TAG_IR, IR_IO_MUX_GPIO6_REG);
     
     // Create PN532 object
     pn532_io_t pn532_io;
@@ -102,7 +95,7 @@ void app_main()
     for (;;)
     {
         // Check IR break
-        ESP_LOGI(TAG_IR, "IR GPIO VALUE: %d", ((*GPIO_IN_REG >> 6) & 0x1));
+        ESP_LOGI(TAG_IR, "IR GPIO VALUE: %d", ((*IR_GPIO_IN_REG >> 6) & 0x1));
 
         // Reset to 0 to avoid lingering values after next iteration
         memset(uid, 0, sizeof(uid));
@@ -122,7 +115,7 @@ void app_main()
             
             uid_value = find_uid_value(uid, uid_length);
 
-            if (uid_value == UID_VAL)
+            if ((uid_value == UID_VAL) && ((*IR_GPIO_IN_REG >> 6) & 0x1))
             {
                 iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 2) + 10); // Slight offset for 90 degrees
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
@@ -133,17 +126,4 @@ void app_main()
         
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-}
-
-uint32_t find_uid_value(uint8_t arr[], uint8_t length) 
-{
-    uint32_t concatValue = arr[0];
-
-    for (int i = 0; i < length - 1; ++i) 
-    {
-        concatValue = (concatValue << 8);
-        concatValue += arr[i + 1];
-    }
-
-    return concatValue;
 }

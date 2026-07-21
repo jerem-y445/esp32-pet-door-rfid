@@ -1,3 +1,9 @@
+/*
+ * door_control.h
+ *
+ * Definitions for servo motor lock and IR break beam
+ */
+
 #include <stdint.h>
 #include "iot_servo.h"
 
