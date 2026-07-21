@@ -15,7 +15,8 @@
                 "C:/esp/v5.5.3/esp-idf/components/hal/include",
                 "C:/esp/v5.5.3/esp-idf/components/soc/esp32s3/include",
                 "C:/esp/v5.5.3/esp-idf/components/esp_driver_gpio/include",
-                "C:/esp/v5.5.3/esp-idf/components/esp_rom/include"
+                "C:/esp/v5.5.3/esp-idf/components/esp_rom/include",
+                "C:/esp/v5.5.3/esp-idf/components/esp_driver_i2c/include/driver"
             ],
             "browse": {
                 "path": [

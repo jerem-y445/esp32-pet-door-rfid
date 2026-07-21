@@ -55,8 +55,6 @@ servo_config_t servo_config = {
     .channel_number = SERVO_CHANNEL_NUM
 };
 
-#define GPIO_OUTPUT_IO CONFIG_GPIO
-
 void app_main() 
 {
     // IR break beam stuff
@@ -72,7 +70,7 @@ void app_main()
 
     // Only runs on I2C at the moment
     ESP_LOGI(TAG_PN532, "INIT PN532 IN I2C MODE");
-    ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, 0, &pn532_io));
+    ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, I2C_PORT_NUM, &pn532_io));
 
     do 
     {  
@@ -87,7 +85,7 @@ void app_main()
 
     ESP_LOGI(TAG_PN532, "WAITING FOR AN ISO14443A CARD...");
 
-    uint8_t uid[] = {0, 0, 0 , 0, 0 , 0, 0};
+    uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
     uint8_t uid_length = 0;
     uint32_t uid_value = 0;
 
@@ -115,15 +113,19 @@ void app_main()
             
             uid_value = find_uid_value(uid, uid_length);
 
-            if ((uid_value == UID_VAL) && ((*IR_GPIO_IN_REG >> 6) & 0x1))
+            if (uid_value == UID_VAL)
             {
                 iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 2) + 10); // Slight offset for 90 degrees
+                
+                do
+                {
+                    vTaskDelay(500 / portTICK_PERIOD_MS);
+                } while (!((*IR_GPIO_IN_REG >> 6) & 0x1)); // Busy wait; first delay to enter the door and break beam
+                
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
                 iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
             }
 
         }
-        
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
