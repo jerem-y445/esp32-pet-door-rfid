@@ -16,6 +16,7 @@
 #include "sdkconfig.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "inc/door_control.h"
 
 /*
  * Main purpose: Get the servo to rotate 90 degrees when card is read. 
@@ -27,24 +28,11 @@
 #define RESET_PIN  (-1) // Could be configured if valid
 #define IRQ_PIN    (4)
 
-#define SERVO_PIN           (5)
-#define SERVO_MAX_ANGLE     180
-#define SERVO_MIN_WIDTH     500
-#define SERVO_MAX_WIDTH     2400
-#define SERVO_FREQ          50
-#define SERVO_TIMER_NUM     LEDC_TIMER_0
-#define SERVO_CHANNEL       LEDC_CHANNEL_0
-#define SERVO_CHANNEL_NUM   1
-#define SERVO_SPEED_MODE    LEDC_LOW_SPEED_MODE
-
-
 // For IR Beam
 //  First enable IO MUX for GPIO 6 to be in input mode
 //  Then, read from 6th bit position from GPIO input register
 uint32_t volatile * const IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
 uint32_t volatile * const GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);
-
-
 
 static const uint32_t UID_VAL = 0x97F6B001;
 static const char *TAG_PN532 = "ntag_read";
@@ -55,8 +43,7 @@ static uint16_t servo_calibration_val_0 = 20;
 static uint16_t servo_calibration_val_180 = 200;
 
 uint32_t find_uid_value(uint8_t arr[], uint8_t length);
-void servo_init(servo_config_t * srv_cfg);
-void ir_init();
+
 
 servo_config_t servo_config = {
     .max_angle      = SERVO_MAX_ANGLE,
@@ -80,13 +67,13 @@ servo_config_t servo_config = {
 void app_main() 
 {
     // IR break beam stuff
-    ir_init();
+    ir_init(TAG_IR, IO_MUX_GPIO6_REG);
     
     // Create PN532 object
     pn532_io_t pn532_io;
     esp_err_t err;
 
-    servo_init(&servo_config);
+    servo_init(TAG_SERVO, &servo_config, SERVO_SPEED_MODE);
 
     printf("APP MAIN\n");
 
@@ -159,23 +146,4 @@ uint32_t find_uid_value(uint8_t arr[], uint8_t length)
     }
 
     return concatValue;
-}
-
-void servo_init(servo_config_t * srv_cfg) 
-{
-    esp_err_t err;
-
-    ESP_LOGI(TAG_SERVO, "INIT SERVO CONTROL");
-
-    err = iot_servo_init(SERVO_SPEED_MODE, srv_cfg);
-    if (err != ESP_OK)
-    {
-        ESP_LOGI(TAG_SERVO, "FAILED TO INIT SERVO");
-    }
-}
-
-void ir_init()
-{
-    *IO_MUX_GPIO6_REG |= (0x1 << 9);
-    ESP_LOGI(TAG_IR, "IR BREAK BEAM INIT");
 }
