@@ -27,8 +27,9 @@
 #include "inc/door_control.h"
 #include "inc/pn532_rfid.h"
 
-void rfid_detect(void * pvParameters);
+void task_rfid_detect(void * pvParameters);
 void ir_wait_for_cat();
+void rfid_init(const char * tag, void * pvParameters);
 
 // Global Flag
 volatile bool is_outside = false;
@@ -92,36 +93,18 @@ void app_main()
     
     ir_init(TAG_IR, IR_IO_MUX_GPIO6_REG);
     servo_init(TAG_SERVO, &servo_config, SERVO_SPEED_MODE);
+    rfid_init(TAG_PN532, &rfid_params);
 
     /*
     * End Init Section
     */
 
-    xTaskCreate(rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, NULL);
+    xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, NULL);
 }
 
-void rfid_detect(void * pvParameters)
+void task_rfid_detect(void * pvParameters)
 {
     rfidParams_t * params = (rfidParams_t *) pvParameters;
-
-    // I2C Device Init
-    ESP_LOGI(TAG_PN532, "INIT PN532 IN I2C MODE");
-    ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, I2C_PORT_NUM, &params->pn532_io));
-    do 
-    {  
-        // PN532 Init
-        params->err = pn532_init(&params->pn532_io);
-        if (params->err != ESP_OK)
-        {
-            ESP_LOGW(TAG_PN532, "FAILED TO INIT PN532");
-            pn532_release(&params->pn532_io);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-        }      
-    } while (params->err != ESP_OK);
-    
-    /*
-    * End Init Section
-    */
 
     uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
     uint8_t uid_length = 0;
@@ -163,6 +146,26 @@ void rfid_detect(void * pvParameters)
             }
         }
     }
+}
+
+void rfid_init(const char * tag, void * pvParameters)
+{
+    rfidParams_t * params = (rfidParams_t *) pvParameters;
+    
+    // I2C Device Init
+    ESP_LOGI(TAG_PN532, "INIT PN532 IN I2C MODE");
+    ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, I2C_PORT_NUM, &params->pn532_io));
+    do 
+    {  
+        // PN532 Init
+        params->err = pn532_init(&params->pn532_io);
+        if (params->err != ESP_OK)
+        {
+            ESP_LOGW(TAG_PN532, "FAILED TO INIT PN532");
+            pn532_release(&params->pn532_io);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }      
+    } while (params->err != ESP_OK);
 }
 
 void ir_wait_for_cat()
