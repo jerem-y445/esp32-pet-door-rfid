@@ -140,22 +140,26 @@ void rfid_detect(void * pvParameters)
 
         if (params->err == ESP_OK)
         {
-            ESP_LOGI(TAG_PN532, "\nFOUND ISO14443A CARD!");
+            ESP_LOGI(TAG_PN532, "FOUND ISO14443A CARD!");
 
             // SUSPEND IR DETECTION FUNCTION HERE !!!
 
             uid_value = find_uid_value(uid, uid_length);
             if (uid_value == UID_VAL)
             {
+                ESP_LOGI(TAG_PN532, "CORRECT UID");
+
                 is_outside = false;
                 
                 // Slight offset for 90 degrees
                 iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 2) + 10);
                 ir_wait_for_cat();
-                
-                // Short after-protection to not close on the pet
-                vTaskDelay(2000 / portTICK_PERIOD_MS); 
                 iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
+            }
+            else 
+            {
+                ESP_LOGI(TAG_PN532, "INCORRECT UID");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
             }
         }
     }
@@ -163,11 +167,18 @@ void rfid_detect(void * pvParameters)
 
 void ir_wait_for_cat()
 {
-    do
+    uint16_t timer = 5000; // in milliseconds
+
+    while (timer > 0)
     {
         vTaskDelay(500 / portTICK_PERIOD_MS);
-        ESP_LOGI(TAG_IR, "IR GPIO VALUE: %d", ((*IR_GPIO_IN_REG >> 6) & 0x1));
-    } while (!((*IR_GPIO_IN_REG >> 6) & 0x1)); // Busy wait; first delay to enter the door and break beam
+        timer -= 500; // 
+        if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
+        {
+            timer = 5000; // Reset timer
+        }
+        ESP_LOGI(TAG_IR, "TIMER: %d", timer);
+    }
 }
 
 /*
