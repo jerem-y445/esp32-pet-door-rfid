@@ -27,7 +27,8 @@
 #include "inc/door_control.h"
 #include "inc/pn532_rfid.h"
 
-void task_main(void * parameters);
+void rfid_detect(void * pvParameters);
+void ir_wait_for_cat();
 
 // Global Flag
 volatile bool is_outside = false;
@@ -39,12 +40,15 @@ volatile bool is_outside = false;
 uint32_t volatile * const IR_IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
 uint32_t volatile * const IR_GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);
 
+// Physical Tag UIDs
 static const uint32_t UID_VAL = 0x97F6B001;
 
 // ESP Log Tags
 static const char *TAG_PN532 = "ntag_read";
 static const char *TAG_SERVO = "servo_control";
 static const char *TAG_IR    = "break_beam";
+// static const char *TAG_MAIN    = "main";
+
 
 // M996R Servo Calibration Values
 static uint16_t servo_calibration_val_0 = 20;
@@ -68,53 +72,110 @@ servo_config_t servo_config = {
     .channel_number = SERVO_CHANNEL_NUM
 };
 
+// Param Structs
+typedef struct 
+{
+    esp_err_t err;
+    pn532_io_t pn532_io;
+} rfidParams_t;
+
+// Param Inits
+rfidParams_t rfid_params = {};
+
 void app_main() 
 {
     printf("APP MAIN\n");
 
-    xTaskCreate(task_main, "Main Task", 4096, NULL, 5, NULL);
-}
-
-void task_main(void * parameters)
-{
     /*
     * Start Init Section
     */
     
     ir_init(TAG_IR, IR_IO_MUX_GPIO6_REG);
     servo_init(TAG_SERVO, &servo_config, SERVO_SPEED_MODE);
-    pn532_io_t pn532_io;
-    esp_err_t err;
 
+    /*
+    * End Init Section
+    */
+
+    xTaskCreate(rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, NULL);
+}
+
+void rfid_detect(void * pvParameters)
+{
+    rfidParams_t * params = (rfidParams_t *) pvParameters;
+
+    // I2C Device Init
     ESP_LOGI(TAG_PN532, "INIT PN532 IN I2C MODE");
-    ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, I2C_PORT_NUM, &pn532_io));
+    ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, I2C_PORT_NUM, &params->pn532_io));
     do 
     {  
-        err = pn532_init(&pn532_io);
-        if (err != ESP_OK)
+        // PN532 Init
+        params->err = pn532_init(&params->pn532_io);
+        if (params->err != ESP_OK)
         {
             ESP_LOGW(TAG_PN532, "FAILED TO INIT PN532");
-            pn532_release(&pn532_io);
+            pn532_release(&params->pn532_io);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }      
-    } while (err != ESP_OK);
+    } while (params->err != ESP_OK);
     
     /*
     * End Init Section
     */
 
-    ESP_LOGI(TAG_PN532, "WAITING FOR AN ISO14443A CARD...");
-
     uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
     uint8_t uid_length = 0;
     uint32_t uid_value = 0;
+    
+    ESP_LOGI(TAG_PN532, "WAITING FOR AN ISO14443A CARD...");
+    
+    // Main loop
+    for (;;)
+    {
+        // Reset to 0 to avoid lingering values after next iteration
+        memset(uid, 0, sizeof(uid));
+        uid_length = 0;
+
+        params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 0);
+
+        if (params->err == ESP_OK)
+        {
+            ESP_LOGI(TAG_PN532, "\nFOUND ISO14443A CARD!");
+
+            // SUSPEND IR DETECTION FUNCTION HERE !!!
+
+            uid_value = find_uid_value(uid, uid_length);
+            if (uid_value == UID_VAL)
+            {
+                is_outside = false;
+                
+                // Slight offset for 90 degrees
+                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 2) + 10);
+                ir_wait_for_cat();
+                
+                // Short after-protection to not close on the pet
+                vTaskDelay(2000 / portTICK_PERIOD_MS); 
+                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
+            }
+        }
+    }
+}
+
+void ir_wait_for_cat()
+{
+    do
+    {
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+        ESP_LOGI(TAG_IR, "IR GPIO VALUE: %d", ((*IR_GPIO_IN_REG >> 6) & 0x1));
+    } while (!((*IR_GPIO_IN_REG >> 6) & 0x1)); // Busy wait; first delay to enter the door and break beam
 }
 
 /*
  * Things to do:
  *  Add global is_outside flag:         done
- *  Write RFID detection function:     
- *  Write IR beam detection function:   
+ *  Write RFID detection function:      
+ *  Write IR detection function:        
+ *  Write IR wait for cat function:     done
  *  
  *  
  * 
