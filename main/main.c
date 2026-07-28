@@ -31,6 +31,7 @@ void task_rfid_detect(void * pvParameters);
 void task_ir_detect(void * pvParameters);
 void ir_wait_for_cat(void);
 void rfid_init(const char * tag, void * pvParameters);
+void servo_open_close(void);
 
 // Global Flag
 volatile bool is_outside = false;
@@ -144,10 +145,7 @@ void task_rfid_detect(void * pvParameters)
 
                 is_outside = false;
                 
-                // Slight offset for 90 degrees
-                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
-                ir_wait_for_cat();
-                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
+                servo_open_close();
             }
             else 
             {
@@ -167,13 +165,11 @@ void task_ir_detect(void * pvParameters)
     {
         if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
         {
+            is_outside = true;
             // SUSPEND RFID DETECTION FUNCTION HERE !!!
             vTaskSuspend(task_rfid_detect_hdl);
             
-            // Slight offset for 90 degrees
-            iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
-            ir_wait_for_cat();
-            iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
+            servo_open_close();
 
             // RESUME RFID DETECTION FUNCTION HERE !!!
             vTaskResume(task_rfid_detect_hdl);
@@ -215,6 +211,14 @@ void ir_wait_for_cat(void)
             timer = IR_START_TIME; // Reset timer
         }
     }
+}
+
+void servo_open_close(void)
+{
+        // Slight offset for 90 degrees
+        iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
+        ir_wait_for_cat();
+        iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
 }
 
 /*
