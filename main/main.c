@@ -28,7 +28,8 @@
 #include "inc/pn532_rfid.h"
 
 void task_rfid_detect(void * pvParameters);
-void ir_wait_for_cat();
+void task_ir_detect(void * pvParameters);
+void ir_wait_for_cat(void);
 void rfid_init(const char * tag, void * pvParameters);
 
 // Global Flag
@@ -83,6 +84,13 @@ typedef struct
 // Param Inits
 rfidParams_t rfid_params = {};
 
+// Handlers
+TaskHandle_t task_rfid_detect_hdl;
+TaskHandle_t task_ir_detect_hdl;
+
+// IR Detection Start Time
+#define IR_START_TIME 5000
+
 void app_main() 
 {
     printf("APP MAIN\n");
@@ -99,7 +107,8 @@ void app_main()
     * End Init Section
     */
 
-    xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, NULL);
+    xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, &task_rfid_detect_hdl);
+    xTaskCreate(task_ir_detect, "IR Inside Detection Task", 4096, NULL, 5, &task_ir_detect_hdl);
 }
 
 void task_rfid_detect(void * pvParameters)
@@ -126,6 +135,7 @@ void task_rfid_detect(void * pvParameters)
             ESP_LOGI(TAG_PN532, "FOUND ISO14443A CARD!");
 
             // SUSPEND IR DETECTION FUNCTION HERE !!!
+            vTaskSuspend(task_ir_detect_hdl);
 
             uid_value = find_uid_value(uid, uid_length);
             if (uid_value == UID_VAL)
@@ -135,16 +145,40 @@ void task_rfid_detect(void * pvParameters)
                 is_outside = false;
                 
                 // Slight offset for 90 degrees
-                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 2) + 10);
-                ir_wait_for_cat();
                 iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
+                ir_wait_for_cat();
+                iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
             }
             else 
             {
                 ESP_LOGI(TAG_PN532, "INCORRECT UID");
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
             }
+
+            // RESUME IR DETECTION FUNCTION HERE !!!
+            vTaskResume(task_ir_detect_hdl);
         }
+    }
+}
+
+void task_ir_detect(void * pvParameters)
+{
+    for(;;)
+    {
+        if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
+        {
+            // SUSPEND RFID DETECTION FUNCTION HERE !!!
+            vTaskSuspend(task_rfid_detect_hdl);
+            
+            // Slight offset for 90 degrees
+            iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
+            ir_wait_for_cat();
+            iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
+
+            // RESUME RFID DETECTION FUNCTION HERE !!!
+            vTaskResume(task_rfid_detect_hdl);
+        }
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -168,19 +202,18 @@ void rfid_init(const char * tag, void * pvParameters)
     } while (params->err != ESP_OK);
 }
 
-void ir_wait_for_cat()
+void ir_wait_for_cat(void)
 {
-    uint16_t timer = 5000; // in milliseconds
+    uint16_t timer = IR_START_TIME; // in milliseconds
 
     while (timer > 0)
     {
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-        timer -= 500; // 
+        vTaskDelay(250 / portTICK_PERIOD_MS);
+        timer -= 250; // 
         if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
         {
-            timer = 5000; // Reset timer
+            timer = IR_START_TIME; // Reset timer
         }
-        ESP_LOGI(TAG_IR, "TIMER: %d", timer);
     }
 }
 
