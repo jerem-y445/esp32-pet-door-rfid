@@ -156,6 +156,7 @@ void task_rfid_detect(void * pvParameters)
             // RESUME IR DETECTION FUNCTION HERE !!!
             vTaskResume(task_ir_detect_hdl);
         }
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -224,8 +225,8 @@ void servo_open_close(void)
 /*
  * Things to do:
  *  Add global is_outside flag:         done
- *  Write RFID detection function:      
- *  Write IR detection function:        
+ *  Write RFID detection function:      done
+ *  Write IR detection function:        done
  *  Write IR wait for cat function:     done
  *  
  *  
