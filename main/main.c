@@ -29,7 +29,7 @@
 
 void task_rfid_detect(void * pvParameters);
 void task_ir_detect(void * pvParameters);
-void ir_wait_for_cat(void);
+void ir_wait_for_cat(uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num);
 void rfid_init(const char * tag, void * pvParameters);
 void servo_open_close(void);
 
@@ -199,7 +199,7 @@ void rfid_init(const char * tag, void * pvParameters)
     } while (params->err != ESP_OK);
 }
 
-void ir_wait_for_cat(void)
+void ir_wait_for_cat(uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num)
 {
     uint16_t timer = IR_START_TIME; // in milliseconds
 
@@ -207,7 +207,7 @@ void ir_wait_for_cat(void)
     {
         vTaskDelay(250 / portTICK_PERIOD_MS);
         timer -= 250; // 
-        if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
+        if (!((*ir_gpio_in_reg >> gpio_num) & 0x1))
         {
             timer = IR_START_TIME; // Reset timer
         }
@@ -218,7 +218,7 @@ void servo_open_close(void)
 {
         // Slight offset for 90 degrees
         iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
-        ir_wait_for_cat();
+        ir_wait_for_cat(IR_GPIO_IN_REG, IR_GPIO_NUM);
         iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
 }
 
