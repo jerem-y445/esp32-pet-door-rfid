@@ -69,6 +69,9 @@ rfidParams_t rfid_params = {};
 TaskHandle_t task_rfid_detect_hdl;
 TaskHandle_t task_ir_detect_hdl;
 
+// Mutex
+SemaphoreHandle_t rfid_hw_mutex;
+
 void app_main() 
 {
     printf("APP MAIN\n");
@@ -84,6 +87,8 @@ void app_main()
     /*
     * End Init Section
     */
+
+    rfid_hw_mutex = xSemaphoreCreateMutex();
 
     xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, &task_rfid_detect_hdl);
     xTaskCreate(task_ir_detect, "IR Inside Detection Task", 4096, NULL, 5, &task_ir_detect_hdl);
@@ -106,31 +111,31 @@ void task_rfid_detect(void * pvParameters)
         memset(uid, 0, sizeof(uid));
         uid_length = 0;
 
-        params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 100);
-
-        if (params->err == ESP_OK)
+        if (xSemaphoreTake(rfid_hw_mutex, portMAX_DELAY) == pdTRUE)
         {
-            ESP_LOGI(TAG_PN532, "FOUND ISO14443A CARD!");
-
-            // SUSPEND IR DETECTION FUNCTION HERE !!!
-            vTaskSuspend(task_ir_detect_hdl);
-
-            uid_value = find_uid_value(uid, uid_length);
-            if (uid_value == UID_VAL)
+            params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 100);
+            
+            if (params->err == ESP_OK)
             {
-                ESP_LOGI(TAG_PN532, "CORRECT UID");
-                
-                servo_open_close();
-            }
-            else 
-            {
-                ESP_LOGI(TAG_PN532, "INCORRECT UID");
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                ESP_LOGI(TAG_PN532, "FOUND ISO14443A CARD!");
+
+                uid_value = find_uid_value(uid, uid_length);
+                if (uid_value == UID_VAL)
+                {
+                    ESP_LOGI(TAG_PN532, "CORRECT UID");
+                    
+                    servo_open_close();
+                }
+                else 
+                {
+                    ESP_LOGI(TAG_PN532, "INCORRECT UID");
+                    vTaskDelay(1000 / portTICK_PERIOD_MS);
+                }
             }
 
-            // RESUME IR DETECTION FUNCTION HERE !!!
-            vTaskResume(task_ir_detect_hdl);
+            xSemaphoreGive(rfid_hw_mutex);
         }
+
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
@@ -141,13 +146,15 @@ void task_ir_detect(void * pvParameters)
     {
         if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
         {
-            // SUSPEND RFID DETECTION FUNCTION HERE !!!
-            vTaskSuspend(task_rfid_detect_hdl);
-            
-            servo_open_close();
-
-            // RESUME RFID DETECTION FUNCTION HERE !!!
-            vTaskResume(task_rfid_detect_hdl);
+            if (xSemaphoreTake(rfid_hw_mutex, portMAX_DELAY) == pdTRUE)
+            {
+                if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
+                {
+                    ESP_LOGI(TAG_IR, "ENTERED IR DETECT TASK");
+                    servo_open_close();
+                }
+                xSemaphoreGive(rfid_hw_mutex);
+            }
         }
         vTaskDelay(20 / portTICK_PERIOD_MS);
     }
