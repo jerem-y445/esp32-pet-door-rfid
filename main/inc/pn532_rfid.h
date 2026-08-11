@@ -28,7 +28,7 @@ typedef struct
  * @brief Initalize PN532 sensor for task_rfid_detect task
  * 
  * @param tag RFID tag for debugging
- * @param params Param struct
+ * @param params Param struct with rfidParams_t
  * @param uid_val Compare value for RFID tag
  * @param ir_gpio_in_reg Input register to read IR bit
  * @param mutex Used by both task_rfid_detect and task_ir_detect

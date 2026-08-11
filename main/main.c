@@ -1,22 +1,22 @@
 /*
  * @file    main.c
  * @author  Jeremy Urena
- * @board   ESP-S3-DevKitC-1 v1.1
+ * @board   ESP32-S3-DevKitC-1 v1.1
  * This is an RTOS-based firmware for authenticating a pet at a door using a PN532 RFID Reader
  * 
  */
 
 #include "inc/main.h"
 
-// Physical Tag UIDs
+/* Physical Tag UIDs */
 static const uint32_t UID_VAL = 0x97F6B001;
 
-// ESP Log Tags
+/* ESP Log Tags */
 static const char *TAG_PN532 = "ntag_read";
 static const char *TAG_SERVO = "servo_control";
 static const char *TAG_IR    = "break_beam";
 
-// M996R Servo Config
+/* M996R Servo Config */
 servo_config_t servo_config = {
     .max_angle      = SERVO_MAX_ANGLE,
     .min_width_us   = SERVO_MIN_WIDTH,
@@ -34,128 +34,34 @@ servo_config_t servo_config = {
     .channel_number = SERVO_CHANNEL_NUM
 };
 
-// Param Inits
+/* Param Inits */
 rfidParams_t rfid_params = {};
 irParams_t ir_params = {};
 
-// Handlers
+/* Handlers */
 TaskHandle_t task_rfid_detect_hdl;
 TaskHandle_t task_ir_detect_hdl;
 
-// Mutex
+/* Mutex */
 SemaphoreHandle_t rfid_hw_mutex;
 
 void app_main() 
 {
-    /*
-    * Start Init Section
-    */
+    /* Start Init Section */
     
     task_rfid_init(TAG_PN532, &rfid_params, UID_VAL, IR_GPIO_IN_REG, &rfid_hw_mutex);
     task_ir_init(TAG_IR, &ir_params, IR_IO_MUX_GPIO6_REG, IR_GPIO_IN_REG, IR_GPIO_NUM, &rfid_hw_mutex);
     servo_init(TAG_SERVO, &servo_config, SERVO_SPEED_MODE);
 
-    /*
-    * End Init Section
-    */
+    /* End Init Section */
+
+
+    /* Start FreeRTOS-related Section */
 
     rfid_hw_mutex = xSemaphoreCreateMutex();
 
     xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, &task_rfid_detect_hdl);
     xTaskCreate(task_ir_detect, "IR Inside Detection Task", 4096, &ir_params, 5, &task_ir_detect_hdl);
+
+    /* End FreeRTOS-related Section */
 }
-
-
-/*
- * Things to do:
- *  Add global is_outside flag:         done
- *  Write RFID detection function:      done
- *  Write IR detection function:        done
- *  Write IR wait for cat function:     done
- *  
- *  
- * 
-
-Changing the logic:
- *
- * When cat is outside: RFID -> Unlock door -> Have motion be detected by IR sensor -> Lock door after cat is out of the way and timer runs out
- * 
- * Before cat walks up:
- *  RFID detection function RUNNING: not detected
- *  IR inside_detection function RUNNING: not detected
- *  IR wait_for_cat function NOT RUNNING
- *  Outside_flag = true
- *  Door locked
- * 
- * As cat approaches:
- *  RFID detection function RUNNING: detected
- *  IR inside_detection function NOT RUNNING
- *  IR wait_for_cat function RUNNING: detected
- *  Outside_flag = false
- *  Door unlocked
- * 
- * Right after cat moves away from beam:
- *  RFID detection function RUNNING: not detected
- *  IR inside_detection function NOT RUNNING
- *  IR wait_for_cat function RUNNING: not detected
- *  Timer starts = 5 secs
- *  Outside_flag = false
- *  Door unlocked
- * 
- * After timer runs out:
- *  RFID detection function RUNNING: not detected
- *  IR inside_detection function RUNNING; not detected
- *  IR wait_for_cat function NOT RUNNING
- *  Outside_flag = true
- *  Door locked
- * 
- * **If cat detected before timer runs out:
- *  RFID detection function RUNNING: not detected
- *  IR inside_detection function NOT RUNNING
- *  IR wait_for_cat function RUNNING: not detected
- *  Timer resets = 5 secs
- *  Outside_flag = false
- *  Door unlocked
- * 
- * 
- * 
- * When cat is inside: IR beam broken with NO AUTHENTICATION (since it's not required when he's already inside the house) -> Lock door after cat is out of the way and timer runs out
- * 
- * Before cat walks up:
- *  RFID detection function RUNNING: not detected
- *  IR inside_detection function RUNNING: not detected
- *  IR wait_for_cat function NOT RUNNING
- *  Outside_flag = false
- *  Door locked
- * 
- * As cat approaches:
- *  RFID detection function NOT RUNNING
- *  IR inside_detection function RUNNING: detected
- *  IR wait_for_cat function NOT RUNNING
- *  Outside_flag = true
- *  Door unlocked
- * 
- * Right after cat moves away from beam
- *  RFID detection function NOT RUNNING
- *  IR inside_detection function RUNNING: not detected
- *  IR wait_for_cat function NOT RUNNING
- *  Outside_flag = true
- *  Timer starts = 5 secs
- *  Door unlocked
- * 
- * After timers runs out
- *  RFID detection function RUNNING: not detected
- *  IR inside_detection function RUNNING: not detected
- *  IR wait_for_cat function NOT RUNNING
- *  Outside_flag = true
- *  Door locked
- * 
- * **If cat detected before timer runs out:
- *  RFID detection function RUNNING: not detected
- *  IR inside_detection function NOT RUNNING
- *  IR wait_for_cat function RUNNING: not detected
- *  Timer resets = 5 secs
- *  Outside_flag = true
- *  Door unlocked
-
-*/

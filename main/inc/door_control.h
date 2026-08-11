@@ -50,7 +50,7 @@ extern uint32_t volatile * const IR_GPIO_IN_REG;
  * @brief Initialize IR break beam register of choice
  *
  * @param tag IR tag for debugging
- * @param params Param struct
+ * @param params Param struct with irParams_t
  * @param io_mux_reg Pointer to IO MUX register
  * @param ir_gpio_in_reg Pointer to specific GPIO input register
  * @param gpio_num Specific GPIO number to probe
