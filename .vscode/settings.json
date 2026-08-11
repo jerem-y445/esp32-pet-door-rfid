@@ -14,5 +14,6 @@
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\jerem\\OneDrive\\Documents\\ESP_IDF\\project_fun\\build"
   ],
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "C_Cpp.errorSquiggles": "enabled"
 }

@@ -9,32 +9,19 @@
  *               and after timer runs out.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
+ #include "inc/main.h"
 
-#include <esp_log.h>
-#include "esp_system.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "sdkconfig.h"
-#include "driver/gpio.h"
-
-#include "iot_servo.h"
-#include "pn532.h"
-#include "pn532_driver_i2c.h"
-
-#include "inc/door_control.h"
-#include "inc/pn532_rfid.h"
+// Param Structs
+typedef struct 
+{
+    esp_err_t err;
+    pn532_io_t pn532_io;
+} rfidParams_t;
 
 void task_rfid_detect(void * pvParameters);
 void task_ir_detect(void * pvParameters);
-void ir_wait_for_cat(uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num);
-void rfid_init(const char * tag, void * pvParameters);
+void rfid_init(const char * tag, rfidParams_t * params);
 void servo_open_close(void);
-
-// Global Flag
-volatile bool is_outside = false;
 
 /* For IR Beam:
  *      First enable IO MUX for GPIO 6 to be in input mode
@@ -75,22 +62,12 @@ servo_config_t servo_config = {
     .channel_number = SERVO_CHANNEL_NUM
 };
 
-// Param Structs
-typedef struct 
-{
-    esp_err_t err;
-    pn532_io_t pn532_io;
-} rfidParams_t;
-
 // Param Inits
 rfidParams_t rfid_params = {};
 
 // Handlers
 TaskHandle_t task_rfid_detect_hdl;
 TaskHandle_t task_ir_detect_hdl;
-
-// IR Detection Start Time
-#define IR_START_TIME 5000
 
 void app_main() 
 {
@@ -129,7 +106,7 @@ void task_rfid_detect(void * pvParameters)
         memset(uid, 0, sizeof(uid));
         uid_length = 0;
 
-        params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 20);
+        params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 100);
 
         if (params->err == ESP_OK)
         {
@@ -142,8 +119,6 @@ void task_rfid_detect(void * pvParameters)
             if (uid_value == UID_VAL)
             {
                 ESP_LOGI(TAG_PN532, "CORRECT UID");
-
-                is_outside = false;
                 
                 servo_open_close();
             }
@@ -156,7 +131,7 @@ void task_rfid_detect(void * pvParameters)
             // RESUME IR DETECTION FUNCTION HERE !!!
             vTaskResume(task_ir_detect_hdl);
         }
-        // vTaskDelay(50 / portTICK_PERIOD_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
 
@@ -166,7 +141,6 @@ void task_ir_detect(void * pvParameters)
     {
         if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
         {
-            is_outside = true;
             // SUSPEND RFID DETECTION FUNCTION HERE !!!
             vTaskSuspend(task_rfid_detect_hdl);
             
@@ -179,10 +153,8 @@ void task_ir_detect(void * pvParameters)
     }
 }
 
-void rfid_init(const char * tag, void * pvParameters)
-{
-    rfidParams_t * params = (rfidParams_t *) pvParameters;
-    
+void rfid_init(const char * tag, rfidParams_t * params)
+{   
     // I2C Device Init
     ESP_LOGI(TAG_PN532, "INIT PN532 IN I2C MODE");
     ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, I2C_PORT_NUM, &params->pn532_io));
@@ -199,26 +171,11 @@ void rfid_init(const char * tag, void * pvParameters)
     } while (params->err != ESP_OK);
 }
 
-void ir_wait_for_cat(uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num)
-{
-    uint16_t timer = IR_START_TIME; // in milliseconds
-
-    while (timer > 0)
-    {
-        vTaskDelay(250 / portTICK_PERIOD_MS);
-        timer -= 250; // 
-        if (!((*ir_gpio_in_reg >> gpio_num) & 0x1))
-        {
-            timer = IR_START_TIME; // Reset timer
-        }
-    }
-}
-
 void servo_open_close(void)
 {
         // Slight offset for 90 degrees
         iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
-        ir_wait_for_cat(IR_GPIO_IN_REG, IR_GPIO_NUM);
+        ir_wait_for_cat(TAG_IR, IR_GPIO_IN_REG, IR_GPIO_NUM);
         iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
 }
 

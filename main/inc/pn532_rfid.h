@@ -4,10 +4,12 @@
  * Definitions PN532 RFID sensor using I2C
  */
 
-#include <stdint.h>
+#include "inc/main.h"
 
 #ifndef PN532_RFID_H
 #define PN532_RFID_H
+
+
 
 #define SCL_PIN         (8)
 #define SDA_PIN         (9)

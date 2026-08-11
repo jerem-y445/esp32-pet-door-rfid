@@ -1,4 +1,4 @@
-#include <stdint.h>
+#include "inc/main.h"
 
 uint32_t find_uid_value(uint8_t arr[], uint8_t length) 
 {

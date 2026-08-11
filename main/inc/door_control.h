@@ -5,11 +5,10 @@
  * 
  */
 
-#include <stdint.h>
-#include "iot_servo.h"
-
 #ifndef DOOR_CONTROL_H
 #define DOOR_CONTROL_H
+
+#include "inc/main.h"
 
 /**
  * Definitions
@@ -26,6 +25,9 @@
 #define SERVO_SPEED_MODE    (LEDC_LOW_SPEED_MODE)
 
 #define IR_GPIO_NUM         (6)
+
+// IR Detection Start Time
+#define IR_START_TIME       (5000)
 
 /**
  * @brief Initialize servo using iot_servo_init function in "iot_servo.h"
@@ -45,5 +47,10 @@ void servo_init(const char *tag, servo_config_t * srv_cfg, uint8_t speed_mode);
  *
  */
 void ir_init(const char *tag, uint32_t volatile * const io_mux_reg);
+
+
+void ir_wait_for_cat(const char * tag, uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num);
+
+
 
 #endif
