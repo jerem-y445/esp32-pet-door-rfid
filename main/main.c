@@ -11,16 +11,6 @@
 
  #include "inc/main.h"
 
-// Param Structs
-typedef struct 
-{
-    esp_err_t err;
-    pn532_io_t pn532_io;
-} rfidParams_t;
-
-void rfid_init(const char * tag, rfidParams_t * params);
-void task_rfid_detect(void * pvParameters);
-
 /* For IR Beam:
  *      First enable IO MUX for GPIO 6 to be in input mode
  *      Then, read from 6th bit position from GPIO input register
@@ -76,7 +66,7 @@ void app_main()
     
     ir_init(TAG_IR, &ir_params, IR_IO_MUX_GPIO6_REG, &rfid_hw_mutex, IR_GPIO_IN_REG, IR_GPIO_NUM);
     servo_init(TAG_SERVO, &servo_config, SERVO_SPEED_MODE);
-    rfid_init(TAG_PN532, &rfid_params);
+    rfid_init(TAG_PN532, &rfid_params, UID_VAL, &rfid_hw_mutex, IR_GPIO_IN_REG);
 
     /*
     * End Init Section
@@ -88,69 +78,6 @@ void app_main()
     xTaskCreate(task_ir_detect, "IR Inside Detection Task", 4096, &ir_params, 5, &task_ir_detect_hdl);
 }
 
-void task_rfid_detect(void * pvParameters)
-{
-    rfidParams_t * params = (rfidParams_t *) pvParameters;
-
-    uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
-    uint8_t uid_length = 0;
-    uint32_t uid_value = 0;
-    
-    ESP_LOGI(TAG_PN532, "WAITING FOR AN ISO14443A CARD...");
-    
-    // Main loop
-    for (;;)
-    {
-        // Reset to 0 to avoid lingering values after next iteration
-        memset(uid, 0, sizeof(uid));
-        uid_length = 0;
-
-        if (xSemaphoreTake(rfid_hw_mutex, portMAX_DELAY) == pdTRUE)
-        {
-            params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 100);
-            
-            if (params->err == ESP_OK)
-            {
-                ESP_LOGI(TAG_PN532, "FOUND ISO14443A CARD!");
-
-                uid_value = find_uid_value(uid, uid_length);
-                if (uid_value == UID_VAL)
-                {
-                    ESP_LOGI(TAG_PN532, "CORRECT UID");
-                    
-                    servo_open_close(IR_GPIO_IN_REG, SERVO_CALIBRATION_VAL_0, SERVO_CALIBRATION_VAL_180);
-                }
-                else 
-                {
-                    ESP_LOGI(TAG_PN532, "INCORRECT UID");
-                    vTaskDelay(1000 / portTICK_PERIOD_MS);
-                }
-            }
-
-            xSemaphoreGive(rfid_hw_mutex);
-        }
-
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-    }
-}
-
-void rfid_init(const char * tag, rfidParams_t * params)
-{   
-    // I2C Device Init
-    ESP_LOGI(TAG_PN532, "INIT PN532 IN I2C MODE");
-    ESP_ERROR_CHECK(pn532_new_driver_i2c(SDA_PIN, SCL_PIN, RESET_PIN, IRQ_PIN, I2C_PORT_NUM, &params->pn532_io));
-    do 
-    {  
-        // PN532 Init
-        params->err = pn532_init(&params->pn532_io);
-        if (params->err != ESP_OK)
-        {
-            ESP_LOGW(TAG_PN532, "FAILED TO INIT PN532");
-            pn532_release(&params->pn532_io);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-        }      
-    } while (params->err != ESP_OK);
-}
 
 /*
  * Things to do:
