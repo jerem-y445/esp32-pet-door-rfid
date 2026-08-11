@@ -4,19 +4,9 @@
  * @board   ESP-S3-DevKitC-1 v1.1
  * This is an RTOS-based firmware for authenticating a pet at a door using a PN532 RFID Reader
  * 
- * Main purpose: Get the servo to rotate 90 degrees when card is read. 
- *               Rotate 90 degrees back once IR break beam is unbroken 
- *               and after timer runs out.
  */
 
- #include "inc/main.h"
-
-/* For IR Beam:
- *      First enable IO MUX for GPIO 6 to be in input mode
- *      Then, read from 6th bit position from GPIO input register
- */
-uint32_t volatile * const IR_IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
-uint32_t volatile * const IR_GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);
+#include "inc/main.h"
 
 // Physical Tag UIDs
 static const uint32_t UID_VAL = 0x97F6B001;
@@ -25,7 +15,6 @@ static const uint32_t UID_VAL = 0x97F6B001;
 static const char *TAG_PN532 = "ntag_read";
 static const char *TAG_SERVO = "servo_control";
 static const char *TAG_IR    = "break_beam";
-// static const char *TAG_MAIN    = "main";
 
 // M996R Servo Config
 servo_config_t servo_config = {
@@ -58,15 +47,13 @@ SemaphoreHandle_t rfid_hw_mutex;
 
 void app_main() 
 {
-    printf("APP MAIN\n");
-
     /*
     * Start Init Section
     */
     
-    ir_init(TAG_IR, &ir_params, IR_IO_MUX_GPIO6_REG, &rfid_hw_mutex, IR_GPIO_IN_REG, IR_GPIO_NUM);
+    task_rfid_init(TAG_PN532, &rfid_params, UID_VAL, IR_GPIO_IN_REG, &rfid_hw_mutex);
+    task_ir_init(TAG_IR, &ir_params, IR_IO_MUX_GPIO6_REG, IR_GPIO_IN_REG, IR_GPIO_NUM, &rfid_hw_mutex);
     servo_init(TAG_SERVO, &servo_config, SERVO_SPEED_MODE);
-    rfid_init(TAG_PN532, &rfid_params, UID_VAL, &rfid_hw_mutex, IR_GPIO_IN_REG);
 
     /*
     * End Init Section
