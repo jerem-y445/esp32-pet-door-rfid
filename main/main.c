@@ -129,7 +129,7 @@ void task_rfid_detect(void * pvParameters)
         memset(uid, 0, sizeof(uid));
         uid_length = 0;
 
-        params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 0);
+        params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 20);
 
         if (params->err == ESP_OK)
         {
@@ -156,7 +156,7 @@ void task_rfid_detect(void * pvParameters)
             // RESUME IR DETECTION FUNCTION HERE !!!
             vTaskResume(task_ir_detect_hdl);
         }
-        vTaskDelay(50 / portTICK_PERIOD_MS);
+        // vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -175,7 +175,7 @@ void task_ir_detect(void * pvParameters)
             // RESUME RFID DETECTION FUNCTION HERE !!!
             vTaskResume(task_rfid_detect_hdl);
         }
-        vTaskDelay(50 / portTICK_PERIOD_MS);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
 
