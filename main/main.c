@@ -18,10 +18,8 @@ typedef struct
     pn532_io_t pn532_io;
 } rfidParams_t;
 
-void task_rfid_detect(void * pvParameters);
-void task_ir_detect(void * pvParameters);
 void rfid_init(const char * tag, rfidParams_t * params);
-void servo_open_close(void);
+void task_rfid_detect(void * pvParameters);
 
 /* For IR Beam:
  *      First enable IO MUX for GPIO 6 to be in input mode
@@ -38,11 +36,6 @@ static const char *TAG_PN532 = "ntag_read";
 static const char *TAG_SERVO = "servo_control";
 static const char *TAG_IR    = "break_beam";
 // static const char *TAG_MAIN    = "main";
-
-
-// M996R Servo Calibration Values
-static uint16_t servo_calibration_val_0 = 20;
-static uint16_t servo_calibration_val_180 = 200;
 
 // M996R Servo Config
 servo_config_t servo_config = {
@@ -64,6 +57,7 @@ servo_config_t servo_config = {
 
 // Param Inits
 rfidParams_t rfid_params = {};
+irParams_t ir_params = {};
 
 // Handlers
 TaskHandle_t task_rfid_detect_hdl;
@@ -80,7 +74,7 @@ void app_main()
     * Start Init Section
     */
     
-    ir_init(TAG_IR, IR_IO_MUX_GPIO6_REG);
+    ir_init(TAG_IR, &ir_params, IR_IO_MUX_GPIO6_REG, &rfid_hw_mutex, IR_GPIO_IN_REG, IR_GPIO_NUM);
     servo_init(TAG_SERVO, &servo_config, SERVO_SPEED_MODE);
     rfid_init(TAG_PN532, &rfid_params);
 
@@ -91,7 +85,7 @@ void app_main()
     rfid_hw_mutex = xSemaphoreCreateMutex();
 
     xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, &task_rfid_detect_hdl);
-    xTaskCreate(task_ir_detect, "IR Inside Detection Task", 4096, NULL, 5, &task_ir_detect_hdl);
+    xTaskCreate(task_ir_detect, "IR Inside Detection Task", 4096, &ir_params, 5, &task_ir_detect_hdl);
 }
 
 void task_rfid_detect(void * pvParameters)
@@ -124,7 +118,7 @@ void task_rfid_detect(void * pvParameters)
                 {
                     ESP_LOGI(TAG_PN532, "CORRECT UID");
                     
-                    servo_open_close();
+                    servo_open_close(IR_GPIO_IN_REG, SERVO_CALIBRATION_VAL_0, SERVO_CALIBRATION_VAL_180);
                 }
                 else 
                 {
@@ -137,26 +131,6 @@ void task_rfid_detect(void * pvParameters)
         }
 
         vTaskDelay(200 / portTICK_PERIOD_MS);
-    }
-}
-
-void task_ir_detect(void * pvParameters)
-{
-    for(;;)
-    {
-        if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
-        {
-            if (xSemaphoreTake(rfid_hw_mutex, portMAX_DELAY) == pdTRUE)
-            {
-                if (!((*IR_GPIO_IN_REG >> 6) & 0x1))
-                {
-                    ESP_LOGI(TAG_IR, "ENTERED IR DETECT TASK");
-                    servo_open_close();
-                }
-                xSemaphoreGive(rfid_hw_mutex);
-            }
-        }
-        vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
 
@@ -176,14 +150,6 @@ void rfid_init(const char * tag, rfidParams_t * params)
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }      
     } while (params->err != ESP_OK);
-}
-
-void servo_open_close(void)
-{
-        // Slight offset for 90 degrees
-        iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_calibration_val_0);
-        ir_wait_for_cat(TAG_IR, IR_GPIO_IN_REG, IR_GPIO_NUM);
-        iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_calibration_val_180 / 3) + 10);
 }
 
 /*
