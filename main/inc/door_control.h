@@ -28,8 +28,8 @@ extern uint32_t volatile * const IR_GPIO_IN_REG;
 #define IR_GPIO_NUM         (6)
 
 /* IR Detection Time Defines */
-#define IR_START_TIME_MS        (5000)
-#define IR_DECREMENT_TIME_MS    (100)
+#define IR_DETECTION_START_TIME_MS      (5000)
+#define IR_DETECTION_DECREMENT_TIME_MS  (100)
 
 /* Servo Config Defines */
 #define SERVO_PIN           (5)

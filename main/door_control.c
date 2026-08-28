@@ -2,7 +2,7 @@
 
 /* IR Register Initalizations */
 uint32_t volatile * const IR_IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
-uint32_t volatile * const IR_GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);
+uint32_t volatile * const IR_GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);    
 
 void task_ir_init(const char *tag, irParams_t * params, uint32_t volatile * const io_mux_reg, uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num, SemaphoreHandle_t * mutex)
 {
@@ -73,7 +73,7 @@ void servo_open_close(uint32_t volatile * const ir_gpio_in_reg, uint32_t servo_c
 {
         iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, servo_cal_val_0);
         
-        ir_wait_for_pet(ir_gpio_in_reg, IR_GPIO_NUM, IR_START_TIME_MS, IR_DECREMENT_TIME_MS);
+        ir_wait_for_pet(ir_gpio_in_reg, IR_GPIO_NUM, IR_DETECTION_START_TIME_MS, IR_DETECTION_DECREMENT_TIME_MS);
         
         // Slight offset for 60 degrees
         iot_servo_write_angle(SERVO_SPEED_MODE, SERVO_CHANNEL, (servo_cal_val_180 / 3) + 10);

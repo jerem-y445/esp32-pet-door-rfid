@@ -1,7 +1,7 @@
 /*
  * @file    main.c
  * @author  Jeremy Urena
- * @board   ESP32-S3-DevKitC-1 v1.1
+ * @board   ESP-S3-DevKitC-1 v1.1
  * This is an RTOS-based firmware for authenticating a pet at a door using a PN532 RFID Reader
  * 
  */
@@ -12,9 +12,9 @@
 static const uint32_t UID_VAL = 0x97F6B001;
 
 /* ESP Log Tags */
-static const char *TAG_PN532 = "ntag_read";
-static const char *TAG_SERVO = "servo_control";
-static const char *TAG_IR    = "break_beam";
+static const char *TAG_PN532 = "PN532";
+static const char *TAG_SERVO = "SERVO";
+static const char *TAG_IR    = "IR";
 
 /* M996R Servo Config */
 servo_config_t servo_config = {
@@ -39,8 +39,8 @@ rfidParams_t rfid_params = {};
 irParams_t ir_params = {};
 
 /* Handlers */
-TaskHandle_t task_rfid_detect_hdl;
-TaskHandle_t task_ir_detect_hdl;
+TaskHandle_t hdl_task_rfid_detect;
+TaskHandle_t hdl_task_ir_detect;
 
 /* Mutex */
 SemaphoreHandle_t rfid_hw_mutex;
@@ -60,8 +60,8 @@ void app_main()
 
     rfid_hw_mutex = xSemaphoreCreateMutex();
 
-    xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 4096, &rfid_params, 5, &task_rfid_detect_hdl);
-    xTaskCreate(task_ir_detect, "IR Inside Detection Task", 4096, &ir_params, 5, &task_ir_detect_hdl);
+    xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 2048, &rfid_params, 5, &hdl_task_rfid_detect);
+    xTaskCreate(task_ir_detect, "IR Inside Detection Task", 2048, &ir_params, 5, &hdl_task_ir_detect);
 
     /* End FreeRTOS-related Section */
 }

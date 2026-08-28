@@ -34,17 +34,16 @@ void task_rfid_detect(void * pvParameters)
     uint64_t uid_value = 0;
     
     ESP_LOGI(params->tag, "WAITING FOR AN ISO14443A TAG...");
-    
+
     for (;;)
-    {
+    {   
         // Reset to 0 to avoid lingering values after next iteration
         memset(uid, 0, sizeof(uid));
         uid_length = 0;
 
-        if (xSemaphoreTake(*params->mutex, portMAX_DELAY) == pdTRUE)
-        {
-            params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 100);
-            
+        params->err = pn532_read_passive_target_id(&params->pn532_io, PN532_BRTY_ISO14443A_106KBPS, uid, &uid_length, 0);
+        if (xSemaphoreTake(*params->mutex, 0) == pdTRUE) 
+        { 
             if (params->err == ESP_OK)
             {
                 ESP_LOGI(params->tag, "FOUND ISO14443A TAG");
@@ -56,17 +55,12 @@ void task_rfid_detect(void * pvParameters)
                     ESP_LOGI(params->tag, "CORRECT UID");
                     servo_open_close(params->ir_gpio_in_reg, SERVO_CALIBRATION_VAL_0, SERVO_CALIBRATION_VAL_180);
                 }
-                else 
-                {
-                    ESP_LOGI(params->tag, "INCORRECT UID");
-                    vTaskDelay(1000 / portTICK_PERIOD_MS);
-                }
+                else { ESP_LOGI(params->tag, "INCORRECT UID"); }
             }
-
             xSemaphoreGive(*params->mutex);
         }
 
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+        vTaskDelay(200);
     }
 }
 
