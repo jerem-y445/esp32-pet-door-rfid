@@ -15,6 +15,7 @@ static const uint32_t UID_VAL = 0x97F6B001;
 static const char *TAG_PN532 = "PN532";
 static const char *TAG_SERVO = "SERVO";
 static const char *TAG_IR    = "IR";
+static const char *TAG_MAIN  = "MAIN";
 
 /* M996R Servo Config */
 servo_config_t servo_config = {
@@ -59,6 +60,11 @@ void app_main()
     /* Start FreeRTOS-related Section */
 
     rfid_hw_mutex = xSemaphoreCreateMutex();
+    if (rfid_hw_mutex == NULL)
+    {
+        ESP_LOGE(TAG_MAIN, "FAILED TO CREATE MUTEX - RESTARTING");
+        esp_restart();
+    }
 
     xTaskCreate(task_rfid_detect, "RFID Outside Detection Task", 2048, &rfid_params, 5, &hdl_task_rfid_detect);
     xTaskCreate(task_ir_detect, "IR Inside Detection Task", 2048, &ir_params, 5, &hdl_task_ir_detect);

@@ -4,19 +4,19 @@
 uint32_t volatile * const IR_IO_MUX_GPIO6_REG  = (uint32_t *) (0x60009000 + (0x0004 + 4 * 6));
 uint32_t volatile * const IR_GPIO_IN_REG       = (uint32_t *) (0x60004000 + 0x003C);    
 
-void task_ir_init(const char *tag, irParams_t * params, uint32_t volatile * const io_mux_reg, uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num, SemaphoreHandle_t * mutex)
+void task_ir_init(const char * tag, irParams_t * params, uint32_t volatile * const io_mux_reg, uint32_t volatile * const gpio_in_reg, uint8_t gpio_pin_num, SemaphoreHandle_t * mutex)
 {
-    ESP_LOGI(tag, "INIT START");
+    ESP_LOGD(tag, "INIT START");
     
-    /* Enable as INPUT */
+    /* Enable as INPUT (IO_MUX_FUN_IE bit) */
     *io_mux_reg |= (0x1 << 9);
 
     params->tag = tag;
-    params->ir_gpio_in_reg = ir_gpio_in_reg;
-    params->gpio_num = gpio_num;
+    params->ir_gpio_in_reg = gpio_in_reg;
+    params->gpio_pin_num = gpio_pin_num;
     params->mutex = mutex;
 
-    ESP_LOGI(tag, "INIT SUCCESSFUL");
+    ESP_LOGD(tag, "INIT SUCCESSFUL");
 }
 
 void servo_init(const char *tag, servo_config_t * srv_cfg, uint8_t speed_mode) 
@@ -35,12 +35,12 @@ void task_ir_detect(void * pvParameters)
 
     for(;;)
     {
-        if (!((*params->ir_gpio_in_reg >> params->gpio_num) & 0x1))
+        if (!((*params->ir_gpio_in_reg >> params->gpio_pin_num) & 0x1))
         {
             if (xSemaphoreTake(*params->mutex, portMAX_DELAY) == pdTRUE)
             {
                 /* Re-check once mutex is granted */
-                if (!((*params->ir_gpio_in_reg >> params->gpio_num) & 0x1))
+                if (!((*params->ir_gpio_in_reg >> params->gpio_pin_num) & 0x1))
                 {
                     ESP_LOGI(params->tag, "START IR DETECT TASK");
                     servo_open_close(params->ir_gpio_in_reg, SERVO_CALIBRATION_VAL_0, SERVO_CALIBRATION_VAL_180);

@@ -46,10 +46,18 @@ void task_rfid_detect(void * pvParameters)
         { 
             if (params->err == ESP_OK)
             {
-                ESP_LOGI(params->tag, "FOUND ISO14443A TAG");
-                ESP_LOGI(params->tag, "COMPARING UID...");
+                ESP_LOGI(params->tag, "ISO14443A TAG FOUND");
 
-                uid_value = find_uid_value(uid, uid_length);
+                if (uid_length >= 1)
+                {
+                    uid_value = find_uid_value(uid, uid_length);
+                }
+                else
+                {
+                    ESP_LOGW(params->tag, "\"uid_length\" IS LESS THAN 1; INVALID");
+                    continue;
+                }
+
                 if (uid_value == params->uid_val)
                 {
                     ESP_LOGI(params->tag, "CORRECT UID");

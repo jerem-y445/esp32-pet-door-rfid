@@ -13,7 +13,7 @@ typedef struct
 {
     const char * tag;
     uint32_t volatile * ir_gpio_in_reg; 
-    uint8_t gpio_num;
+    uint8_t gpio_pin_num;
     SemaphoreHandle_t * mutex;
 } irParams_t;
 
@@ -89,7 +89,7 @@ void task_ir_detect(void * pvParameters);
 void ir_wait_for_pet(uint32_t volatile * const ir_gpio_in_reg, uint8_t gpio_num, uint32_t start_time, uint32_t decrem_time);
 
 /**
- * @brief Turns servo 60 degrees (unlocked state) as fast as SERVO_SPEED_MODE and waits for pet to leave to rotate back to 0 degrees (locked state)
+ * @brief Turns servo 0 degrees (unlocked state) as fast as SERVO_SPEED_MODE and waits for pet to leave to rotate back to 60 degrees (locked state)
  * 
  * @param ir_gpio_in_reg Pointer to specific GPIO input register
  * @param servo_cal_val_0 Specific to SERVO_CALIBRATION_VAL_0 define
